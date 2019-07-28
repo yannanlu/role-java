@@ -1,0 +1,45 @@
+---
+- name: Get stats of java tarball
+  stat:
+    path: "/var/cache/ansible/{{java_artifact}}"
+    get_md5: no
+    get_checksum: no
+  register: st_java_tarball
+
+- name: Get the artifact via s3
+  command: "aws s3 --region {{region|default('us-east-2')}} cp {{java_repo_url}}/{{java_artifact}} /var/cache/ansible/"
+  when: not st_java_tarball.stat.exists and java_repo_url|regex_search('^s3:')
+  register: new_tar_java1
+
+- name: Get the artifact via http
+  get_url:
+    url: "{{java_repo_url}}/{{java_artifact}}"
+    dest: /var/cache/ansible/
+    validate_certs: "{{java_validate_certs}}"
+  when: not st_java_tarball.stat.exists and not java_repo_url|regex_search('^s3:')
+  register: new_tar_java2
+
+- name: Get stats of java_home
+  stat:
+    path: "{{java_home}}"
+    get_md5: no
+    get_checksum: no
+  register: st_java
+
+- name: Create dirs of /opt/java
+  file:
+    path: "{{java_home|dirname}}"
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Unarchive source
+  unarchive:
+    src: "/var/cache/ansible/{{java_artifact}}"
+    dest: "{{java_home|dirname}}"
+    remote_src: yes
+    owner: root
+    group: root
+    mode: 0775
+  when: new_tar_java1 is changed or new_tar_java2 is changed or not st_java.stat.exists

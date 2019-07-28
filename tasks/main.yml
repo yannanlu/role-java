@@ -4,3 +4,7 @@
     name: "{{java_pkg_name}}"
     state: present
     update_cache: yes
+  when: java_repo_url|length == 0 
+
+- include: java.yml
+  when: java_repo_url|length > 0
